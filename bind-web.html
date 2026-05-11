@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BIND Web</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #000;
+      --fg: #fff;
+      --accent: #0A84FF;
+      --tab-inactive: #8E8E93;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow: hidden;
+      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      touch-action: pan-y;
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 60px 20px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+    }
+
+    .title {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 24px;
+      position: relative;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .tab {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--tab-inactive);
+      cursor: pointer;
+      padding: 8px 0;
+      transition: color 0.2s ease;
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      white-space: nowrap;
+    }
+
+    .tab.active {
+      color: var(--fg);
+    }
+
+    .tab-indicator {
+      position: absolute;
+      bottom: 0;
+      height: 2px;
+      background: var(--accent);
+      transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform, width;
+    }
+
+    .content-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .content-wrapper {
+      display: flex;
+      height: 100%;
+      will-change: transform;
+      touch-action: pan-y;
+    }
+
+    .content-panel {
+      min-width: 100vw;
+      width: 100vw;
+      height: 100%;
+      padding: 24px 20px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .post {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(20px);
+      transition: transform 0.2s ease, background 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+      color: inherit;
+    }
+
+    .post:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .post-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+    }
+
+    .post-meta {
+      font-size: 13px;
+      color: var(--tab-inactive);
+      display: flex;
+      gap: 12px;
+    }
+
+    .post-genre {
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--accent);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 12px;
+      color: #000;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--tab-inactive);
+      gap: 12px;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      opacity: 0.3;
+    }
+
+    .empty-text {
+      font-size: 15px;
+    }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--tab-inactive);
+      font-size: 15px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fff;
+        --fg: #000;
+        --accent: #007AFF;
+        --tab-inactive: #8E8E93;
+        --border: rgba(0, 0, 0, 0.1);
+      }
+
+      .post-genre {
+        color: #fff;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="header">
+      <div class="title">BIND</div>
+      <div class="tabs" id="tabs"></div>
+    </div>
+
+    <div class="content-container">
+      <div class="content-wrapper" id="contentWrapper"></div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+    import { getFirestore, collection, query, orderBy, limit, getDocs, where } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+    import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyANdpCLNWw0jkyJCEicGmwsUYCET21lcts",
+      authDomain: "bind-ba8ac.firebaseapp.com",
+      projectId: "bind-ba8ac",
+      storageBucket: "bind-ba8ac.firebasestorage.app",
+      messagingSenderId: "1055983361135",
+      appId: "1:1055983361135:web:23a89469e31396ae2e819a"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const auth = getAuth(app);
+
+    // 匿名ログイン
+    await signInAnonymously(auth);
+
+    class BINDApp {
+      constructor() {
+        this.currentIndex = 0;
+        this.tabs = [];
+        this.posts = {};
+        this.startX = 0;
+        this.currentX = 0;
+        this.isDragging = false;
+        this.startTime = 0;
+        this.isHorizontalSwipe = null;
+
+        this.wrapper = document.getElementById('contentWrapper');
+        this.tabsContainer = document.getElementById('tabs');
+
+        this.init();
+      }
+
+      async init() {
+        await this.loadTabs();
+        await this.loadPosts();
+        this.setupSwipe();
+        this.updateIndicator();
+      }
+
+      async loadTabs() {
+        // 固定タブ + カスタムタブを取得
+        const userId = auth.currentUser.uid;
+        const tabSettingsSnap = await getDocs(collection(db, 'users', userId, 'tabSettings'));
+
+        const customTabs = [];
+        tabSettingsSnap.forEach(doc => {
+          const data = doc.data();
+          if (data.isVisible !== false) {
+            customTabs.push({
+              name: data.name,
+              genre: data.name,
+              isCustom: true
+            });
+          }
+        });
+
+        // デフォルトタブ
+        this.tabs = [
+          { name: '音楽', genre: '音楽' },
+          { name: '映像', genre: '映像' },
+          { name: 'YouTube', genre: 'YouTube' },
+          { name: '書籍', genre: '書籍' },
+          ...customTabs
+        ];
+
+        this.renderTabs();
+      }
+
+      renderTabs() {
+        this.tabsContainer.innerHTML = this.tabs.map((tab, i) =>
+          `<div class="tab ${i === 0 ? 'active' : ''}" data-index="${i}">${tab.name}</div>`
+        ).join('') + '<div class="tab-indicator" id="indicator"></div>';
+
+        this.tabElements = document.querySelectorAll('.tab:not(#indicator)');
+        this.indicator = document.getElementById('indicator');
+
+        this.tabElements.forEach((tab, index) => {
+          tab.addEventListener('click', () => this.goToTab(index));
+        });
+      }
+
+      async loadPosts() {
+        const userId = auth.currentUser.uid;
+
+        for (const tab of this.tabs) {
+          try {
+            const postsQuery = query(
+              collection(db, 'users', userId, 'posts'),
+              where('genre', '==', tab.genre),
+              orderBy('createdAt', 'desc'),
+              limit(20)
+            );
+
+            const snapshot = await getDocs(postsQuery);
+            this.posts[tab.genre] = snapshot.docs.map(doc => ({
+              id: doc.id,
+              ...doc.data()
+            }));
+          } catch (error) {
+            console.error(`Error loading posts for ${tab.genre}:`, error);
+            this.posts[tab.genre] = [];
+          }
+        }
+
+        this.renderPanels();
+      }
+
+      renderPanels() {
+        this.wrapper.innerHTML = this.tabs.map(tab => {
+          const tabPosts = this.posts[tab.genre] || [];
+
+          if (tabPosts.length === 0) {
+            return `
+              <div class="content-panel">
+                <div class="empty-state">
+                  <div class="empty-icon">📝</div>
+                  <div class="empty-text">まだ投稿がありません</div>
+                </div>
+              </div>
+            `;
+          }
+
+          return `
+            <div class="content-panel">
+              ${tabPosts.map(post => this.renderPost(post)).join('')}
+            </div>
+          `;
+        }).join('');
+      }
+
+      renderPost(post) {
+        const timeAgo = this.getTimeAgo(post.createdAt?.toDate());
+        const url = this.getPostUrl(post);
+
+        return `
+          <a href="${url}" class="post" target="_blank">
+            <div class="post-title">${this.escapeHtml(post.title || 'タイトルなし')}</div>
+            <div class="post-meta">
+              <span>${timeAgo}</span>
+            </div>
+            <span class="post-genre">${this.escapeHtml(post.genre)}</span>
+          </a>
+        `;
+      }
+
+      getPostUrl(post) {
+        if (post.url) return post.url;
+        if (post.spotifyUri) return `https://open.spotify.com/track/${post.spotifyUri.split(':').pop()}`;
+        if (post.appleMusicUrl) return post.appleMusicUrl;
+        return '#';
+      }
+
+      getTimeAgo(date) {
+        if (!date) return '';
+        const now = new Date();
+        const diff = now - date;
+        const minutes = Math.floor(diff / 60000);
+        const hours = Math.floor(minutes / 60);
+        const days = Math.floor(hours / 24);
+
+        if (days > 0) return `${days}日前`;
+        if (hours > 0) return `${hours}時間前`;
+        if (minutes > 0) return `${minutes}分前`;
+        return 'たった今';
+      }
+
+      escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      setupSwipe() {
+        const contentContainer = document.querySelector('.content-container');
+        contentContainer.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+        contentContainer.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+        contentContainer.addEventListener('touchend', this.handleTouchEnd.bind(this));
+
+        this.wrapper.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        document.addEventListener('mouseup', this.handleMouseEnd.bind(this));
+      }
+
+      handleTouchStart(e) {
+        this.startX = e.touches[0].clientX;
+        this.startY = e.touches[0].clientY;
+        this.currentX = this.startX;
+        this.isDragging = false;
+        this.isHorizontalSwipe = null;
+        this.startTime = Date.now();
+      }
+
+      handleTouchMove(e) {
+        const currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+        const diffX = currentX - this.startX;
+        const diffY = currentY - this.startY;
+
+        if (this.isHorizontalSwipe === null && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
+          this.isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+          if (this.isHorizontalSwipe) {
+            this.isDragging = true;
+            this.wrapper.style.transition = 'none';
+          }
+        }
+
+        if (!this.isHorizontalSwipe) return;
+
+        e.preventDefault();
+        this.currentX = currentX;
+        const baseOffset = -this.currentIndex * window.innerWidth;
+
+        let offset = baseOffset + diffX;
+        if (this.currentIndex === 0 && diffX > 0) {
+          offset = baseOffset + diffX * 0.3;
+        } else if (this.currentIndex === this.tabs.length - 1 && diffX < 0) {
+          offset = baseOffset + diffX * 0.3;
+        }
+
+        this.wrapper.style.transform = `translateX(${offset}px)`;
+      }
+
+      handleTouchEnd(e) {
+        if (!this.isHorizontalSwipe || !this.isDragging) {
+          this.isDragging = false;
+          this.isHorizontalSwipe = null;
+          return;
+        }
+
+        const diff = this.currentX - this.startX;
+        const velocity = diff / (Date.now() - this.startTime);
+        const threshold = window.innerWidth * 0.25;
+
+        if (Math.abs(diff) > threshold || Math.abs(velocity) > 0.5) {
+          if (diff > 0 && this.currentIndex > 0) {
+            this.currentIndex--;
+          } else if (diff < 0 && this.currentIndex < this.tabs.length - 1) {
+            this.currentIndex++;
+          }
+        }
+
+        this.isDragging = false;
+        this.isHorizontalSwipe = null;
+        this.snapToCurrentTab();
+      }
+
+      handleMouseDown(e) {
+        this.startX = e.clientX;
+        this.currentX = this.startX;
+        this.isDragging = true;
+        this.startTime = Date.now();
+        this.wrapper.style.transition = 'none';
+        e.preventDefault();
+      }
+
+      handleMouseMove(e) {
+        if (!this.isDragging) return;
+
+        this.currentX = e.clientX;
+        const diff = this.currentX - this.startX;
+        const baseOffset = -this.currentIndex * window.innerWidth;
+
+        let offset = baseOffset + diff;
+        if (this.currentIndex === 0 && diff > 0) {
+          offset = baseOffset + diff * 0.3;
+        } else if (this.currentIndex === this.tabs.length - 1 && diff < 0) {
+          offset = baseOffset + diff * 0.3;
+        }
+
+        this.wrapper.style.transform = `translateX(${offset}px)`;
+      }
+
+      handleMouseEnd(e) {
+        if (!this.isDragging) return;
+
+        const diff = this.currentX - this.startX;
+        const velocity = diff / (Date.now() - this.startTime);
+        const threshold = window.innerWidth * 0.25;
+
+        if (Math.abs(diff) > threshold || Math.abs(velocity) > 0.5) {
+          if (diff > 0 && this.currentIndex > 0) {
+            this.currentIndex--;
+          } else if (diff < 0 && this.currentIndex < this.tabs.length - 1) {
+            this.currentIndex++;
+          }
+        }
+
+        this.isDragging = false;
+        this.snapToCurrentTab();
+      }
+
+      snapToCurrentTab() {
+        this.wrapper.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        this.wrapper.style.transform = `translateX(-${this.currentIndex * 100}vw)`;
+        this.updateActiveTab();
+        this.updateIndicator();
+      }
+
+      goToTab(index) {
+        if (index === this.currentIndex) return;
+        this.currentIndex = index;
+        this.snapToCurrentTab();
+      }
+
+      updateActiveTab() {
+        this.tabElements.forEach((tab, index) => {
+          tab.classList.toggle('active', index === this.currentIndex);
+        });
+      }
+
+      updateIndicator() {
+        const activeTab = this.tabElements[this.currentIndex];
+        const { offsetLeft, offsetWidth } = activeTab;
+        this.indicator.style.left = `${offsetLeft}px`;
+        this.indicator.style.width = `${offsetWidth}px`;
+      }
+    }
+
+    // Initialize
+    new BINDApp();
+  </script>
+</body>
+</html>
