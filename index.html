@@ -301,9 +301,10 @@
 
       init() {
         // Touch events
-        this.wrapper.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
-        this.wrapper.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
-        this.wrapper.addEventListener('touchend', this.handleTouchEnd.bind(this));
+        this.contentContainer = document.querySelector('.content-container');
+        this.contentContainer.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+        this.contentContainer.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+        this.contentContainer.addEventListener('touchend', this.handleTouchEnd.bind(this));
 
         // Mouse events (for desktop testing)
         this.wrapper.addEventListener('mousedown', this.handleMouseDown.bind(this));
@@ -318,26 +319,41 @@
 
       handleTouchStart(e) {
         this.startX = e.touches[0].clientX;
+        this.startY = e.touches[0].clientY;
         this.currentX = this.startX;
-        this.isDragging = true;
+        this.isDragging = false;
+        this.isHorizontalSwipe = null;
         this.startTime = Date.now();
-        this.wrapper.style.transition = 'none';
       }
 
       handleTouchMove(e) {
-        if (!this.isDragging) return;
+        const currentX = e.touches[0].clientX;
+        const currentY = e.touches[0].clientY;
+        const diffX = currentX - this.startX;
+        const diffY = currentY - this.startY;
+
+        // Determine swipe direction on first move
+        if (this.isHorizontalSwipe === null && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
+          this.isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
+          if (this.isHorizontalSwipe) {
+            this.isDragging = true;
+            this.wrapper.style.transition = 'none';
+          }
+        }
+
+        // Only handle horizontal swipes
+        if (!this.isHorizontalSwipe) return;
 
         e.preventDefault();
-        this.currentX = e.touches[0].clientX;
-        const diff = this.currentX - this.startX;
+        this.currentX = currentX;
         const baseOffset = -this.currentIndex * window.innerWidth;
 
         // Resistance at edges
-        let offset = baseOffset + diff;
-        if (this.currentIndex === 0 && diff > 0) {
-          offset = baseOffset + diff * 0.3;
-        } else if (this.currentIndex === this.tabCount - 1 && diff < 0) {
-          offset = baseOffset + diff * 0.3;
+        let offset = baseOffset + diffX;
+        if (this.currentIndex === 0 && diffX > 0) {
+          offset = baseOffset + diffX * 0.3;
+        } else if (this.currentIndex === this.tabCount - 1 && diffX < 0) {
+          offset = baseOffset + diffX * 0.3;
         }
 
         this.wrapper.style.transform = `translateX(${offset}px)`;
