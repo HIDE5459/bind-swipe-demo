@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>BIND風タブスワイプデモ</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #000;
+      --fg: #fff;
+      --accent: #0A84FF;
+      --tab-inactive: #8E8E93;
+      --border: rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      overflow: hidden;
+      height: 100vh;
+      -webkit-font-smoothing: antialiased;
+      touch-action: pan-y;
+    }
+
+    .app {
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 60px 20px 16px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      position: relative;
+      z-index: 10;
+    }
+
+    .title {
+      font-size: 34px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 20px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 24px;
+      position: relative;
+    }
+
+    .tab {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--tab-inactive);
+      cursor: pointer;
+      padding: 8px 0;
+      transition: color 0.2s ease;
+      position: relative;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .tab.active {
+      color: var(--fg);
+    }
+
+    .tab-indicator {
+      position: absolute;
+      bottom: 0;
+      height: 2px;
+      background: var(--accent);
+      transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+      will-change: transform, width;
+    }
+
+    .content-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .content-wrapper {
+      display: flex;
+      height: 100%;
+      will-change: transform;
+      touch-action: pan-y;
+    }
+
+    .content-panel {
+      min-width: 100vw;
+      width: 100vw;
+      height: 100%;
+      padding: 24px 20px;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .post {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(20px);
+      transition: transform 0.2s ease, background 0.2s ease;
+      cursor: pointer;
+      text-decoration: none;
+      display: block;
+    }
+
+    .post:active {
+      transform: scale(0.98);
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .post-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      letter-spacing: -0.3px;
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .post-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .post-meta {
+      font-size: 13px;
+      color: var(--tab-inactive);
+      display: flex;
+      gap: 12px;
+    }
+
+    .post-genre {
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--accent);
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      margin-top: 12px;
+      color: #000;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: var(--tab-inactive);
+      gap: 12px;
+    }
+
+    .empty-icon {
+      font-size: 48px;
+      opacity: 0.3;
+    }
+
+    .empty-text {
+      font-size: 15px;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fff;
+        --fg: #000;
+        --accent: #007AFF;
+        --tab-inactive: #8E8E93;
+        --border: rgba(0, 0, 0, 0.1);
+      }
+
+      .post-genre {
+        color: #fff;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <div class="header">
+      <div class="title">投稿</div>
+      <div class="tabs" id="tabs">
+        <div class="tab active" data-index="0">音楽</div>
+        <div class="tab" data-index="1">映像</div>
+        <div class="tab" data-index="2">YouTube</div>
+        <div class="tab" data-index="3">書籍</div>
+        <div class="tab-indicator" id="indicator"></div>
+      </div>
+    </div>
+
+    <div class="content-container">
+      <div class="content-wrapper" id="contentWrapper">
+        <!-- 音楽 -->
+        <div class="content-panel">
+          <a href="https://music.apple.com/jp/album/one-more-time/697194953?i=697195395" class="post post-link" target="_blank">
+            <div class="post-title">Daft Punk - One More Time</div>
+            <div class="post-meta">
+              <span>2時間前</span>
+            </div>
+            <span class="post-genre">音楽</span>
+          </a>
+          <a href="https://music.apple.com/jp/album/humble/1440890708?i=1440891671" class="post post-link" target="_blank">
+            <div class="post-title">Kendrick Lamar - HUMBLE.</div>
+            <div class="post-meta">
+              <span>5時間前</span>
+            </div>
+            <span class="post-genre">音楽</span>
+          </a>
+          <a href="https://music.apple.com/jp/album/bad-guy/1450695723?i=1450695739" class="post post-link" target="_blank">
+            <div class="post-title">Billie Eilish - bad guy</div>
+            <div class="post-meta">
+              <span>1日前</span>
+            </div>
+            <span class="post-genre">音楽</span>
+          </a>
+        </div>
+
+        <!-- 映像 -->
+        <div class="content-panel">
+          <a href="https://tv.apple.com/jp/movie/inception/umc.cmc.65elo9ve8um1b5hzs9xj0kz5b" class="post post-link" target="_blank">
+            <div class="post-title">インセプション</div>
+            <div class="post-meta">
+              <span>3時間前</span>
+            </div>
+            <span class="post-genre">映像</span>
+          </a>
+          <a href="https://tv.apple.com/jp/movie/blade-runner-2049/umc.cmc.2rqcfkaqyyjdnzwn8a1zjr8sy" class="post post-link" target="_blank">
+            <div class="post-title">ブレードランナー 2049</div>
+            <div class="post-meta">
+              <span>1日前</span>
+            </div>
+            <span class="post-genre">映像</span>
+          </a>
+        </div>
+
+        <!-- YouTube -->
+        <div class="content-panel">
+          <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="post post-link" target="_blank">
+            <div class="post-title">Fireship - 100 Seconds of Code</div>
+            <div class="post-meta">
+              <span>30分前</span>
+            </div>
+            <span class="post-genre">YouTube</span>
+          </a>
+          <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="post post-link" target="_blank">
+            <div class="post-title">MKBHD - iPhone 15 Review</div>
+            <div class="post-meta">
+              <span>2時間前</span>
+            </div>
+            <span class="post-genre">YouTube</span>
+          </a>
+          <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ" class="post post-link" target="_blank">
+            <div class="post-title">Veritasium - The Most Powerful Computers</div>
+            <div class="post-meta">
+              <span>4時間前</span>
+            </div>
+            <span class="post-genre">YouTube</span>
+          </a>
+        </div>
+
+        <!-- 書籍 -->
+        <div class="content-panel">
+          <div class="empty-state">
+            <div class="empty-icon">📚</div>
+            <div class="empty-text">まだ投稿がありません</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class SwipeableTabs {
+      constructor() {
+        this.currentIndex = 0;
+        this.tabCount = 4;
+        this.startX = 0;
+        this.currentX = 0;
+        this.isDragging = false;
+        this.startTime = 0;
+
+        this.wrapper = document.getElementById('contentWrapper');
+        this.tabs = document.querySelectorAll('.tab');
+        this.indicator = document.getElementById('indicator');
+
+        this.init();
+        this.updateIndicator();
+      }
+
+      init() {
+        // Touch events
+        this.wrapper.addEventListener('touchstart', this.handleTouchStart.bind(this), { passive: true });
+        this.wrapper.addEventListener('touchmove', this.handleTouchMove.bind(this), { passive: false });
+        this.wrapper.addEventListener('touchend', this.handleTouchEnd.bind(this));
+
+        // Mouse events (for desktop testing)
+        this.wrapper.addEventListener('mousedown', this.handleMouseDown.bind(this));
+        document.addEventListener('mousemove', this.handleMouseMove.bind(this));
+        document.addEventListener('mouseup', this.handleMouseEnd.bind(this));
+
+        // Tab clicks
+        this.tabs.forEach((tab, index) => {
+          tab.addEventListener('click', () => this.goToTab(index));
+        });
+      }
+
+      handleTouchStart(e) {
+        this.startX = e.touches[0].clientX;
+        this.currentX = this.startX;
+        this.isDragging = true;
+        this.startTime = Date.now();
+        this.wrapper.style.transition = 'none';
+      }
+
+      handleTouchMove(e) {
+        if (!this.isDragging) return;
+
+        e.preventDefault();
+        this.currentX = e.touches[0].clientX;
+        const diff = this.currentX - this.startX;
+        const baseOffset = -this.currentIndex * window.innerWidth;
+
+        // Resistance at edges
+        let offset = baseOffset + diff;
+        if (this.currentIndex === 0 && diff > 0) {
+          offset = baseOffset + diff * 0.3;
+        } else if (this.currentIndex === this.tabCount - 1 && diff < 0) {
+          offset = baseOffset + diff * 0.3;
+        }
+
+        this.wrapper.style.transform = `translateX(${offset}px)`;
+      }
+
+      handleTouchEnd(e) {
+        if (!this.isDragging) return;
+
+        const diff = this.currentX - this.startX;
+        const velocity = diff / (Date.now() - this.startTime);
+        const threshold = window.innerWidth * 0.25;
+
+        // Determine if swipe was significant
+        if (Math.abs(diff) > threshold || Math.abs(velocity) > 0.5) {
+          if (diff > 0 && this.currentIndex > 0) {
+            this.currentIndex--;
+          } else if (diff < 0 && this.currentIndex < this.tabCount - 1) {
+            this.currentIndex++;
+          }
+        }
+
+        this.isDragging = false;
+        this.snapToCurrentTab();
+      }
+
+      handleMouseDown(e) {
+        this.startX = e.clientX;
+        this.currentX = this.startX;
+        this.isDragging = true;
+        this.startTime = Date.now();
+        this.wrapper.style.transition = 'none';
+        e.preventDefault();
+      }
+
+      handleMouseMove(e) {
+        if (!this.isDragging) return;
+
+        this.currentX = e.clientX;
+        const diff = this.currentX - this.startX;
+        const baseOffset = -this.currentIndex * window.innerWidth;
+
+        let offset = baseOffset + diff;
+        if (this.currentIndex === 0 && diff > 0) {
+          offset = baseOffset + diff * 0.3;
+        } else if (this.currentIndex === this.tabCount - 1 && diff < 0) {
+          offset = baseOffset + diff * 0.3;
+        }
+
+        this.wrapper.style.transform = `translateX(${offset}px)`;
+      }
+
+      handleMouseEnd(e) {
+        if (!this.isDragging) return;
+
+        const diff = this.currentX - this.startX;
+        const velocity = diff / (Date.now() - this.startTime);
+        const threshold = window.innerWidth * 0.25;
+
+        if (Math.abs(diff) > threshold || Math.abs(velocity) > 0.5) {
+          if (diff > 0 && this.currentIndex > 0) {
+            this.currentIndex--;
+          } else if (diff < 0 && this.currentIndex < this.tabCount - 1) {
+            this.currentIndex++;
+          }
+        }
+
+        this.isDragging = false;
+        this.snapToCurrentTab();
+      }
+
+      snapToCurrentTab() {
+        this.wrapper.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+        this.wrapper.style.transform = `translateX(-${this.currentIndex * 100}vw)`;
+        this.updateActiveTab();
+        this.updateIndicator();
+      }
+
+      goToTab(index) {
+        if (index === this.currentIndex) return;
+        this.currentIndex = index;
+        this.snapToCurrentTab();
+      }
+
+      updateActiveTab() {
+        this.tabs.forEach((tab, index) => {
+          tab.classList.toggle('active', index === this.currentIndex);
+        });
+      }
+
+      updateIndicator() {
+        const activeTab = this.tabs[this.currentIndex];
+        const { offsetLeft, offsetWidth } = activeTab;
+        this.indicator.style.left = `${offsetLeft}px`;
+        this.indicator.style.width = `${offsetWidth}px`;
+      }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      new SwipeableTabs();
+    });
+
+    // Update indicator on resize
+    let resizeTimer;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        const tabs = new SwipeableTabs();
+      }, 250);
+    });
+  </script>
+</body>
+</html>
