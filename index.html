@@ -360,7 +360,11 @@
       }
 
       handleTouchEnd(e) {
-        if (!this.isDragging) return;
+        if (!this.isHorizontalSwipe || !this.isDragging) {
+          this.isDragging = false;
+          this.isHorizontalSwipe = null;
+          return;
+        }
 
         const diff = this.currentX - this.startX;
         const velocity = diff / (Date.now() - this.startTime);
@@ -376,6 +380,7 @@
         }
 
         this.isDragging = false;
+        this.isHorizontalSwipe = null;
         this.snapToCurrentTab();
       }
 
